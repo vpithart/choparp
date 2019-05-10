@@ -3,7 +3,7 @@
 
    Copyright (c) 1997 Takamichi Tateoka (tree@mma.club.uec.ac.jp)
    Copyright (c) 2002-2015 Thomas Quinot (thomas@cuivre.fr.eu.org)
-   
+
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
    are met:
@@ -15,7 +15,7 @@
    3. Neither the name of the authors nor the names of their contributors
       may be used to endorse or promote products derived from this software
       without specific prior written permission.
-   
+
    THIS SOFTWARE IS PROVIDED BY THE AUTHORS AND CONTRIBUTORS ``AS IS'' AND
    ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
    IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -58,9 +58,9 @@
 #include <net/if_dl.h>
 #endif
 
-/* ARP Header                                      */ 
-#define ARP_REQUEST 1   /* ARP Request             */ 
-#define ARP_REPLY 2     /* ARP Reply               */ 
+/* ARP Header                                      */
+#define ARP_REQUEST 1   /* ARP Request             */
+#define ARP_REPLY 2     /* ARP Reply               */
 
 struct cidr {
 	struct cidr *next;
@@ -121,14 +121,14 @@ open_pcap(char *ifname, char *filter_str) {
        fprintf(stderr, "pcap_open_live failed: %s\n", errbuf);
        exit(1);
     }
-    
-    /* Compiles the filter expression */ 
+
+    /* Compiles the filter expression */
     if (pcap_compile(pc, &filter, filter_str, 1, PCAP_NETMASK_UNKNOWN) == -1){
        fprintf(stderr, "pcap_compile failed: %s\n", pcap_geterr(pc) );
        exit(1);
     }
 
-    /* Set filter program */ 
+    /* Set filter program */
     if (pcap_setfilter(pc, &filter) == -1){
        fprintf(stderr, "pcap_setfilter failed: %s\n", pcap_geterr(pc));
        exit(1);
@@ -170,6 +170,14 @@ cleanup(int sig){
 void
 process_arp(u_char *user, const struct pcap_pkthdr *pkthdr, const u_char *packet) {
     gen_arpreply((u_char *)packet);
+#ifdef DEBUG
+    printf("process_arp mac1 %02x:%02x:%02x:%02x:%02x:%02x mac2 %02x:%02x:%02x:%02x:%02x:%02x src_ip %u.%u.%u.%u dst_ip %u.%u.%u.%u\n",
+        packet[0], packet[1], packet[2], packet[3], packet[4], packet[5], target_mac[0],
+        target_mac[1], target_mac[2], target_mac[3], target_mac[4], target_mac[5],
+        packet[28], packet[29], packet[30], packet[31],
+        packet[38], packet[39], packet[40], packet[41]
+    );
+#endif
     pcap_inject((pcap_t *)user, packet, pkthdr->len);
 }
 
@@ -250,7 +258,7 @@ atoip(char *buf, u_int32_t *ip_addr){
     if (sscanf(buf, "0x%lx", (unsigned long *) ip_addr) == 1)
 	return(0);
 
-    return(-1);	
+    return(-1);
 }
 
 void
@@ -345,7 +353,6 @@ main(int argc, char **argv){
 
     SHOW(targets);
     SHOW(excludes);
-    exit (0);
 #endif
 
     targets_filter = cidr_to_str(targets);
@@ -355,6 +362,7 @@ main(int argc, char **argv){
                     "and arp[4] == 6 "    /* Hw addr length: 6 */    \
                     "and arp[5] == 4 "    /* Proto addr length: 4 */ \
                     "and arp[6:2] == 1 "  /* Operation: Request */   \
+                    "and arp[14:4] != arp[24:4] " /* omit gratuitous ARP packets */ \
                     "and (%s)"
 
 #define EXCL_FILTER TMPL_FILTER " and not (%s)"
@@ -362,6 +370,7 @@ main(int argc, char **argv){
         asprintf (&filter, TMPL_FILTER, targets_filter);
     else
         asprintf (&filter, EXCL_FILTER, targets_filter, excludes_filter);
+
 
 #ifdef DEBUG
         fprintf(stderr, "Filter on %s: %s\n", ifname, filter);
