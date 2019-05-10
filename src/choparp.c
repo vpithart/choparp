@@ -363,6 +363,7 @@ main(int argc, char **argv){
                     "and arp[5] == 4 "    /* Proto addr length: 4 */ \
                     "and arp[6:2] == 1 "  /* Operation: Request */   \
                     "and arp[14:4] != arp[24:4] " /* omit gratuitous ARP packets */ \
+                    "and arp[14:4] != 0x00000000 " /* omit unknown packets */ \
                     "and (%s)"
 
 #define EXCL_FILTER TMPL_FILTER " and not (%s)"
